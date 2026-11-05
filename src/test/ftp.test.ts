@@ -13,14 +13,14 @@ describe('parseList', () => {
     it('parses the non-standard YRC1000 listing', () => {
         const text = [
             'd---------   - ----     ---            0 JAN 30  2025 JOB',
-            '----------   - ----     ---            0 NOV 03 18:45 MP999_MP3.JBI',
-            '----------   - ----     ---            0 JUL 01  2025 MP1_MP8.JBI',
+            '----------   - ----     ---            0 NOV 03 18:45 TEST1.JBI',
+            '----------   - ----     ---            0 JUL 01  2025 TEST2.JBI',
             '',
         ].join('\r\n');
         assert.deepEqual(parseList(text), [
             { name: 'JOB', isDir: true, modified: 'JAN 30 2025' },
-            { name: 'MP999_MP3.JBI', isDir: false, modified: 'NOV 03 18:45' },
-            { name: 'MP1_MP8.JBI', isDir: false, modified: 'JUL 01 2025' },
+            { name: 'TEST1.JBI', isDir: false, modified: 'NOV 03 18:45' },
+            { name: 'TEST2.JBI', isDir: false, modified: 'JUL 01 2025' },
         ]);
     });
 
@@ -194,7 +194,7 @@ describe('FtpClient against a mock YRC1000', () => {
         fs.rmSync(local, { recursive: true, force: true });
     });
 
-    const connect = (password = 'secret') => FtpClient.connect({ host: '127.0.0.1', port, user: 'rcmaster', password, timeoutMs: 3000 });
+    const connect = (password = 'secret') => FtpClient.connect({ host: '127.0.0.1', port, user: 'ftpuser', password, timeoutMs: 3000 });
 
     it('lists, switches folders, downloads and uploads byte-exact', async () => {
         const client = await connect();
