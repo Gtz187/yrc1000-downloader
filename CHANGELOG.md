@@ -2,6 +2,12 @@
 
 All notable changes to this extension are documented here.
 
+## 1.3.1
+
+- The automatic reference read starts with `JOB` and logs its start and result.
+- A single unreadable file no longer aborts the reference read.
+- The log shows the number of stored references and changed files, so missing badges can be diagnosed.
+
 ## 1.3.0
 
 - **Changed files at a glance.** The extension remembers what was on the controller at the last download, upload or check. Changed files get a badge in the Explorer, the editor tabs and the controller view: **M** changed locally, **R** changed on the controller, **!** both, **U** only local. The robot icon in the activity bar shows the number of changed files.
