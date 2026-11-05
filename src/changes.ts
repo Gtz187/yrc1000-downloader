@@ -2,7 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as vscode from 'vscode';
 import { Cancelled, Controller, ControllerService } from './controllers';
-import { RemoteEntry } from './ftp';
+import { FtpError, RemoteEntry } from './ftp';
 import { Baseline, ChangeStatus, classify, fileKey, hashContent } from './syncLogic';
 import { localPathFor, remoteTargetOf } from './tree';
 
@@ -45,6 +45,8 @@ export class ChangeTracker implements vscode.FileDecorationProvider, vscode.Disp
     private readonly disposables: vscode.Disposable[] = [];
     /** Controllers for which the automatic reference read was already started in this session. */
     private readonly autoStarted = new Set<string>();
+    private lastCount = -1;
+    private decorationLogged = false;
 
     constructor(
         private readonly ctx: vscode.ExtensionContext,
@@ -74,13 +76,24 @@ export class ChangeTracker implements vscode.FileDecorationProvider, vscode.Disp
             return;
         }
         if (!mayPrompt && !(await this.service.hasPassword(c))) {
+            this.log.info(`Change tracking: no stored password for ${c.name}, reference is read after the first connection`);
             return;
         }
-        const dirs = this.trackedDirs(c).filter((d) => this.untrackedLocalFiles(c, d).length > 0);
+        if (this.autoStarted.has(this.id(c))) {
+            return; // started by another call while waiting for the password check
+        }
         this.autoStarted.add(this.id(c));
+        // Jobs first: that is where changes matter most.
+        const dirs = this.trackedDirs(c)
+            .filter((d) => this.untrackedLocalFiles(c, d).length > 0)
+            .sort((a, b) => Number(b.toUpperCase() === 'JOB') - Number(a.toUpperCase() === 'JOB'));
+        this.log.info(
+            `Change tracking: ${this.baselinesOf(c).size} reference(s) stored for ${c.name}; folders ${this.trackedDirs(c).join(', ') || '–'}; without reference: ${dirs.join(', ') || '–'}`,
+        );
         if (!dirs.length) {
             return;
         }
+        this.log.info(`Change tracking: reading reference from ${c.name} for files without one (${dirs.join(', ')})`);
         try {
             const count = await vscode.window.withProgress(
                 { location: vscode.ProgressLocation.Window, title: t('Reading reference from {0}…', c.name) },
@@ -184,7 +197,11 @@ export class ChangeTracker implements vscode.FileDecorationProvider, vscode.Disp
         for (const id of this.unsaved) {
             const map = this.baselines.get(id);
             if (map) {
-                void this.ctx.workspaceState.update(STATE_PREFIX + id, Object.fromEntries(map));
+                const size = map.size;
+                this.ctx.workspaceState.update(STATE_PREFIX + id, Object.fromEntries(map)).then(
+                    () => this.log.info(`Change tracking: ${size} reference(s) saved`),
+                    (err: unknown) => this.log.error(`Change tracking: saving references failed: ${err instanceof Error ? err.message : String(err)}`),
+                );
             }
         }
         this.unsaved.clear();
@@ -309,8 +326,16 @@ export class ChangeTracker implements vscode.FileDecorationProvider, vscode.Disp
                     throw new Cancelled();
                 }
                 progress.report({ message: `${p.dir}/${p.name} (${done + 1}/${plan.length})`, increment: 100 / plan.length });
-                await this.record(c, p.dir, p.name, await client.read(p.dir, p.name), p.stamp);
-                done++;
+                try {
+                    await this.record(c, p.dir, p.name, await client.read(p.dir, p.name), p.stamp);
+                    done++;
+                } catch (err) {
+                    // A single unreadable file must not stop the check; a lost connection must.
+                    if (!(err instanceof FtpError) || err.connectionLost) {
+                        throw err;
+                    }
+                    this.log.warn(`Change tracking: ${p.dir}/${p.name} could not be read: ${err.message}`);
+                }
             }
             return done;
         }, c);
@@ -334,7 +359,12 @@ export class ChangeTracker implements vscode.FileDecorationProvider, vscode.Disp
         if (!target?.dir) {
             return undefined;
         }
-        return decorationFor(await this.statusOf(c, target.dir, target.name));
+        const status = await this.statusOf(c, target.dir, target.name);
+        if (!this.decorationLogged) {
+            this.decorationLogged = true;
+            this.log.info(`Change tracking: decorations active (first: ${target.dir}/${target.name} → ${status})`);
+        }
+        return decorationFor(status);
     }
 
     // --------------------------------------------------------------- refresh
@@ -361,8 +391,14 @@ export class ChangeTracker implements vscode.FileDecorationProvider, vscode.Disp
             this.decorationsChanged.fire(undefined);
             const c = this.service.active;
             void (c ? this.changedFiles(c) : Promise.resolve([])).then(
-                (files) => this.summaryChanged.fire(files),
-                () => undefined,
+                (files) => {
+                    if (files.length !== this.lastCount) {
+                        this.lastCount = files.length;
+                        this.log.info(`Change tracking: ${files.length} changed file(s)`);
+                    }
+                    this.summaryChanged.fire(files);
+                },
+                (err: unknown) => this.log.error(`Change tracking: ${err instanceof Error ? err.message : String(err)}`),
             );
         }, REFRESH_DELAY_MS);
     }
