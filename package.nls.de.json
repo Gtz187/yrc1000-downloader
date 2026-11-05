@@ -33,6 +33,7 @@
   "config.controllers.downloadFolders": "Steuerungsordner für „Standardordner herunterladen“. Überschreibt yrc1000.downloadFolders.",
   "config.downloadFolders": "Steuerungsordner, die **YRC1000: Standardordner herunterladen** lädt, z. B. `JOB`, `DAT`, `CND`, `SYS`, `PRM`.",
   "config.confirmUpload": "Vor dem Hochladen auf die Steuerung nachfragen.",
+  "config.checkJobHeader": "Vor dem Hochladen eines Jobs (.JBI) den Kopf mit dem Job auf der Steuerung vergleichen und warnen, wenn globale Positionsvariablen (P, BP, EX), Positionen des Jobs oder eine neuere Version auf der Steuerung überschrieben würden.",
   "config.uploadOnSave": "Dateien beim Speichern automatisch auf die aktive Steuerung hochladen. Gilt nur für Dateien in einem Steuerungsordner wie `JOB/`.",
   "config.timeout": "Zeitlimit in Millisekunden für den Verbindungsaufbau und Antworten der Steuerung."
 }

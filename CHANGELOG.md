@@ -2,6 +2,13 @@
 
 All notable changes to this extension are documented here.
 
+## 1.4.0
+
+- **Job header check before upload.** Loading a job writes the global position variables in its header (P, BP, EX) into the controller. Before a `.JBI` is uploaded, its header is now compared with the job on the controller (and with `DAT/VAR.DAT` for globals the controller job does not use). If global variables, positions of the job would be overwritten or the controller version is newer (`///DATE`), a dialog shows robot and file values side by side:
+  - **Take Over Robot Positions** – keeps your program, writes the controller's values into the file, then uploads it,
+  - **Upload Anyway**, or **Skip File**.
+- Also applies to upload on save. Can be switched off with `yrc1000.checkJobHeader`.
+
 ## 1.3.1
 
 - The automatic reference read starts with `JOB` and logs its start and result.

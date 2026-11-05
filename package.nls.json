@@ -33,6 +33,7 @@
   "config.controllers.downloadFolders": "Controller folders for 'Download Default Folders'. Overrides yrc1000.downloadFolders.",
   "config.downloadFolders": "Controller folders downloaded by **YRC1000: Download Default Folders**, e.g. `JOB`, `DAT`, `CND`, `SYS`, `PRM`.",
   "config.confirmUpload": "Ask for confirmation before files are uploaded to the controller.",
+  "config.checkJobHeader": "Before a job (.JBI) is uploaded, compare its header with the job on the controller and warn if global position variables (P, BP, EX), positions of the job or a newer controller version would be overwritten.",
   "config.uploadOnSave": "Upload a file to the active controller automatically when it is saved. Only applies to files inside a controller folder such as `JOB/`.",
   "config.timeout": "Timeout in milliseconds for connecting and for controller replies."
 }

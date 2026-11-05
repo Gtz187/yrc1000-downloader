@@ -41,6 +41,7 @@ Browse the controller like a folder, open jobs read-only, compare them with your
 | ⬆️ **Upload to Robot** | From the Explorer, the editor tab or the editor context menu. You confirm before anything is written to the controller. |
 | 🛟 **Safe upload with automatic restore** | The YRC1000 deletes a job it rejects (e.g. syntax error). Before every upload the current version is backed up; if the upload is rejected, the original is written back automatically and you see the controller's error message. |
 | 🔍 **Compare with Robot** | Differences between your local file and the controller version in the VS Code diff editor. |
+| 🧭 **Job header check** | Before a job is uploaded, its header is compared with the controller. Global position variables (P, BP, EX) and re-taught positions that the upload would overwrite are shown side by side – take over the robot values, upload anyway or skip the file. |
 | 🟡 **Changed files at a glance** | Badges in the Explorer, the editor tabs and the controller view: **M** changed locally, **R** changed on the controller, **!** both, **U** only local. The robot icon shows how many files differ; **Show Changed Files** lists them and opens the diff. |
 | 🤖 **Multiple controllers** | Guided setup; the status bar shows the active controller and switches with one click. |
 | 🎨 **INFORM syntax highlighting** | Instructions, motion commands, variables, labels, comments and position data in `.JBI` jobs. |
@@ -126,6 +127,7 @@ The guided setup writes the controllers to `.vscode/settings.json` of your works
 | `yrc1000.controllers` | `[]` | Controllers: `name`, `host`, `port` (21), `username`, `password` (optional), `localFolder`, `downloadFolders` |
 | `yrc1000.downloadFolders` | `["JOB"]` | Default folders for *Download Default Folders* |
 | `yrc1000.confirmUpload` | `true` | Ask before uploading |
+| `yrc1000.checkJobHeader` | `true` | Compare the job header with the controller before uploading and warn before global positions are overwritten |
 | `yrc1000.uploadOnSave` | `false` | Upload files in controller folders automatically when they are saved |
 | `yrc1000.timeout` | `15000` | Timeout in ms for connecting and for controller replies |
 

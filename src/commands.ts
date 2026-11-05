@@ -4,6 +4,7 @@ import * as vscode from 'vscode';
 import { Cancelled, Controller, ControllerService, UserError } from './controllers';
 import { FtpClient } from './ftp';
 import { ChangeTracker, statusText } from './changes';
+import { adoptRobotValues, compareHeaders, formatValues, HeaderComparison, needsAttention, parseVarDat, VarDiff } from './jobHeader';
 import { BackupFailedError, SaveBackup, safeUploadAll, UploadRejectedError } from './safeUpload';
 import { localPathFor, remoteTargetOf, remoteUri, RemoteNode, RemoteTree, sortEntries } from './tree';
 
@@ -294,8 +295,114 @@ export class Commands {
             );
         }
 
-        const count = await this.uploadSafely(c, plan, false);
+        const checked = await this.checkJobHeaders(c, plan);
+        const count = await this.uploadSafely(c, checked, false);
         this.done(t('{0} file(s) uploaded to {1}.', count, c.name));
+    }
+
+    /**
+     * Compares the header (//POS) of every job with the job on the controller before it is uploaded.
+     * Loading a job writes its global position variables (P, BP, EX) into the controller, so an outdated
+     * header would overwrite positions that were taught on the teach pendant – also for other jobs.
+     * @returns the files that should be uploaded (skipped files removed)
+     */
+    private async checkJobHeaders(c: Controller, plan: Transfer[]): Promise<Transfer[]> {
+        const jobs = plan.filter((p) => /\.jbi$/i.test(p.name));
+        if (!jobs.length || !vscode.workspace.getConfiguration('yrc1000').get<boolean>('checkJobHeader', true)) {
+            return plan;
+        }
+        const results = await vscode.window.withProgress(
+            { location: vscode.ProgressLocation.Notification, title: t('Comparing job headers with {0}…', c.name) },
+            () =>
+                this.service.run(async (client) => {
+                    const listings = new Map<string, Set<string>>();
+                    const exists = async (dir: string, name: string) => {
+                        if (!listings.has(dir)) {
+                            listings.set(dir, new Set((await client.list(dir)).filter((e) => !e.isDir).map((e) => e.name.toUpperCase())));
+                        }
+                        return listings.get(dir)!.has(name.toUpperCase());
+                    };
+                    let varDat: ReturnType<typeof parseVarDat> | undefined;
+                    const out: { item: Transfer; local: string; comparison: HeaderComparison }[] = [];
+                    for (const item of jobs) {
+                        const local = (await fs.promises.readFile(item.local)).toString('latin1');
+                        const robot = (await exists(item.dir, item.name)) ? (await client.read(item.dir, item.name)).toString('latin1') : undefined;
+                        let comparison = compareHeaders(local, robot, varDat);
+                        // Globals the controller job does not use: compare with the controller's variable file.
+                        if (comparison.unknown.length && !varDat && (await exists('DAT', 'VAR.DAT'))) {
+                            varDat = parseVarDat((await client.read('DAT', 'VAR.DAT')).toString('latin1'));
+                            comparison = compareHeaders(local, robot, varDat);
+                        }
+                        out.push({ item, local, comparison });
+                    }
+                    return out;
+                }),
+        );
+
+        const skipped = new Set<Transfer>();
+        for (const { item, local, comparison } of results) {
+            this.log.info(
+                `Header check ${item.dir}/${item.name}: ${comparison.diffs.length} position(s) differ, robot newer: ${comparison.robotNewer}, unknown: ${comparison.unknown.join(' ') || '–'}`,
+            );
+            if (!needsAttention(comparison)) {
+                continue;
+            }
+            const choice = await this.askHeaderConflict(item, comparison);
+            if (choice === 'skip') {
+                skipped.add(item);
+            } else if (choice === 'adopt') {
+                const adopted = adoptRobotValues(local, comparison.diffs);
+                await fs.promises.writeFile(item.local, Buffer.from(adopted, 'latin1'));
+                this.log.info(`Header check ${item.dir}/${item.name}: robot positions taken over into ${item.local}`);
+            }
+        }
+        const rest = plan.filter((p) => !skipped.has(p));
+        if (!rest.length) {
+            throw new Cancelled();
+        }
+        return rest;
+    }
+
+    private async askHeaderConflict(item: Transfer, c: HeaderComparison): Promise<'upload' | 'adopt' | 'skip'> {
+        const line = (d: VarDiff) =>
+            `${d.name}${d.source === 'VAR.DAT' ? ' (VAR.DAT)' : ''}\n   ${t('Robot')}: ${formatValues(d.robotValues)}\n   ${t('File')}:  ${formatValues(d.local.values)}`;
+        const globals = c.diffs.filter((d) => d.global);
+        const locals = c.diffs.filter((d) => !d.global);
+        const parts: string[] = [];
+        if (c.robotNewer) {
+            parts.push(t('The job on the controller is newer ({0}) than the file ({1}). Changes made on the teach pendant would be lost.', c.robotDate ?? '', c.localDate ?? ''));
+        }
+        if (globals.length) {
+            parts.push(t('GLOBAL position variables – also used by other jobs:') + '\n' + listOf(globals.map(line), 8));
+        }
+        if (locals.length) {
+            parts.push(t('Positions of this job:') + '\n' + listOf(locals.map(line), 6));
+        }
+        if (c.attributes.length) {
+            parts.push(listOf(c.attributes.map((a) => `${a.keyword}: ${a.robot ?? '–'} → ${a.local ?? '–'}`), 5));
+        }
+        const adoptable = c.diffs.filter((d) => d.replacement !== undefined);
+        const notAdoptable = c.diffs.length - adoptable.length;
+        if (adoptable.length && notAdoptable) {
+            parts.push(t('{0} value(s) cannot be taken over automatically (different position type or only in VAR.DAT).', notAdoptable));
+        }
+
+        const adopt = t('Take Over Robot Positions');
+        const upload = t('Upload Anyway');
+        const skip = t('Skip File');
+        const answer = await vscode.window.showWarningMessage(
+            globals.length
+                ? t('{0} would overwrite {1} global position variable(s) on the controller', `${item.dir}/${item.name}`, globals.length)
+                : t('{0} differs from the job on the controller', `${item.dir}/${item.name}`),
+            { modal: true, detail: parts.join('\n\n') },
+            ...(adoptable.length ? [adopt] : []),
+            upload,
+            skip,
+        );
+        if (answer === undefined) {
+            throw new Cancelled();
+        }
+        return answer === adopt ? 'adopt' : answer === skip ? 'skip' : 'upload';
     }
 
     /** Silent upload used by "upload on save". */
@@ -308,7 +415,9 @@ export class Commands {
         if (!target?.dir) {
             return;
         }
-        await this.uploadSafely(c, [{ local: doc.uri.fsPath, ...target }], true);
+        // The header check asks only if the upload would overwrite positions; otherwise it stays silent.
+        const plan = await this.checkJobHeaders(c, [{ local: doc.uri.fsPath, ...target }]);
+        await this.uploadSafely(c, plan, true);
         this.tree.refresh();
         vscode.window.setStatusBarMessage(`$(cloud-upload) ${t('{0} uploaded to {1}', `${target.dir}/${target.name}`, c.name)}`, 4000);
     }
