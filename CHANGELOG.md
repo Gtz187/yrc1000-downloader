@@ -2,6 +2,14 @@
 
 All notable changes to this extension are documented here.
 
+## 1.3.0
+
+- **Changed files at a glance.** The extension remembers what was on the controller at the last download, upload or check. Changed files get a badge in the Explorer, the editor tabs and the controller view: **M** changed locally, **R** changed on the controller, **!** both, **U** only local. The robot icon in the activity bar shows the number of changed files.
+- New command **Show Changed Files**: lists all differences and opens the diff of the picked file.
+- Files downloaded with an older version have no reference yet. It is read automatically in the background (read-only) as soon as the controller is reachable without a password prompt.
+- New command **Check with Robot…**: reads the chosen controller folders (read-only) and takes them as the new reference.
+- Changes on the controller are detected by the date in the FTP listing (the YRC1000 reports no file sizes).
+
 ## 1.2.0
 
 - **Safe upload.** Before a file is replaced, the current version is backed up from the controller. If the controller rejects the new file (e.g. `451 Error closing file.--[5110]--` for a job with a syntax error), it deletes the file. The extension now writes the original back automatically and explains what happened.

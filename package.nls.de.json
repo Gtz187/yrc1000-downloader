@@ -21,6 +21,8 @@
   "cmd.showLog": "Protokoll anzeigen",
   "cmd.openSettings": "Einstellungen öffnen",
   "cmd.openBackups": "Upload-Sicherungen öffnen",
+  "cmd.showChanges": "Geänderte Dateien anzeigen",
+  "cmd.checkChanges": "Mit Roboter abgleichen…",
   "config.controllers": "Robotersteuerungen dieses Arbeitsbereichs. Mit **YRC1000: Robotersteuerung hinzufügen…** fügst du eine hinzu. Passwörter stehen nie hier, sondern im sicheren Speicher von VS Code.",
   "config.controllers.name": "Anzeigename, z. B. Zelle oder Roboternummer.",
   "config.controllers.host": "IP-Adresse der YRC1000-Steuerung.",

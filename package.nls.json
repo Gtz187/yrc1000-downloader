@@ -21,6 +21,8 @@
   "cmd.showLog": "Show Log",
   "cmd.openSettings": "Open Settings",
   "cmd.openBackups": "Open Upload Backups",
+  "cmd.showChanges": "Show Changed Files",
+  "cmd.checkChanges": "Check with Robot…",
   "config.controllers": "Robot controllers of this workspace. Use **YRC1000: Add Robot Controller…** to add one. Passwords are never stored here but in the VS Code secret storage.",
   "config.controllers.name": "Display name, e.g. cell or robot number.",
   "config.controllers.host": "IP address of the YRC1000 controller.",

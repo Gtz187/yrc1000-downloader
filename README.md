@@ -41,6 +41,7 @@ Browse the controller like a folder, open jobs read-only, compare them with your
 | ⬆️ **Upload to Robot** | From the Explorer, the editor tab or the editor context menu. You confirm before anything is written to the controller. |
 | 🛟 **Safe upload with automatic restore** | The YRC1000 deletes a job it rejects (e.g. syntax error). Before every upload the current version is backed up; if the upload is rejected, the original is written back automatically and you see the controller's error message. |
 | 🔍 **Compare with Robot** | Differences between your local file and the controller version in the VS Code diff editor. |
+| 🟡 **Changed files at a glance** | Badges in the Explorer, the editor tabs and the controller view: **M** changed locally, **R** changed on the controller, **!** both, **U** only local. The robot icon shows how many files differ; **Show Changed Files** lists them and opens the diff. |
 | 🤖 **Multiple controllers** | Guided setup; the status bar shows the active controller and switches with one click. |
 | 🎨 **INFORM syntax highlighting** | Instructions, motion commands, variables, labels, comments and position data in `.JBI` jobs. |
 | 🔐 **Secure by default** | Passwords live in the VS Code secret storage. Optionally a `password` in `settings.json` takes precedence – remember that file is plain text. |
@@ -98,6 +99,8 @@ All commands are in the Command Palette under **YRC1000:**.
 | Upload to Robot | Uploads the selected files or folder, or the active file |
 | Compare with Robot | Diff between the local file and the controller version |
 | Open Upload Backups | Shows the backups taken before each upload |
+| Show Changed Files | Lists the files that differ between the local folder and the controller; pick one to see the diff |
+| Check with Robot… | Reads the chosen controller folders (read-only) and takes them as the new reference for change tracking. Missing references are read automatically in the background. |
 | Test Connection | Connects and lists the controller folders |
 | Set FTP Password… / Clear Stored FTP Password | Manage the stored password |
 | Show Log | FTP log. Set the log level to *Debug* to see the full FTP conversation (passwords are masked). |

@@ -3,8 +3,11 @@ import * as path from 'path';
 import * as vscode from 'vscode';
 import { Cancelled, Controller, ControllerService, UserError } from './controllers';
 import { FtpClient } from './ftp';
+import { ChangeTracker, statusText } from './changes';
 import { BackupFailedError, SaveBackup, safeUploadAll, UploadRejectedError } from './safeUpload';
-import { localPathFor, remoteUri, RemoteNode, RemoteTree, sortEntries } from './tree';
+import { localPathFor, remoteTargetOf, remoteUri, RemoteNode, RemoteTree, sortEntries } from './tree';
+
+export { remoteTargetOf };
 
 const t = vscode.l10n.t;
 
@@ -15,6 +18,8 @@ interface Transfer {
     local: string;
     dir: string;
     name: string;
+    /** Listing date on the controller, if known. */
+    stamp?: string;
 }
 
 export class Commands {
@@ -23,6 +28,7 @@ export class Commands {
         private readonly tree: RemoteTree,
         private readonly log: vscode.LogOutputChannel,
         private readonly backupRoot: string,
+        private readonly changes: ChangeTracker,
     ) {}
 
     // ------------------------------------------------------------ controllers
@@ -176,7 +182,7 @@ export class Commands {
             await this.downloadFolders(c, dirs);
         }
         if (files.length) {
-            const plan = files.map((n) => ({ dir: n.dir, name: n.name, local: localPathFor(c, n.dir, n.name) }));
+            const plan = files.map((n) => ({ dir: n.dir, name: n.name, local: localPathFor(c, n.dir, n.name), stamp: n.modified }));
             const existing = plan.filter((p) => fs.existsSync(p.local));
             if (existing.length) {
                 await confirm(
@@ -188,6 +194,7 @@ export class Commands {
             const count = await this.transfer(t('Downloading from {0}', c.name), plan, async (client, p) => {
                 await fs.promises.mkdir(path.dirname(p.local), { recursive: true });
                 await client.download(p.dir, p.name, p.local);
+                await this.changes.record(c, p.dir, p.name, p.local, p.stamp);
             });
             this.done(t('{0} file(s) downloaded.', count), plan.length === 1 ? plan[0].local : undefined);
         }
@@ -211,8 +218,10 @@ export class Commands {
                 this.service.run(async (client) => {
                     const items: Transfer[] = [];
                     for (const dir of dirs) {
-                        const files = (await client.list(dir)).filter((e) => !e.isDir);
-                        items.push(...files.map((f) => ({ dir, name: f.name, local: localPathFor(c, dir, f.name) })));
+                        const entries = await client.list(dir);
+                        this.changes.noteListing(c, dir, entries);
+                        const files = entries.filter((e) => !e.isDir);
+                        items.push(...files.map((f) => ({ dir, name: f.name, local: localPathFor(c, dir, f.name), stamp: f.modified })));
                     }
                     return items;
                 }),
@@ -220,7 +229,10 @@ export class Commands {
         for (const dir of dirs) {
             await fs.promises.mkdir(path.join(c.localFolder, ...dir.split('/')), { recursive: true });
         }
-        const count = await this.transfer(t('Downloading from {0}', c.name), plan, (client, p) => client.download(p.dir, p.name, p.local));
+        const count = await this.transfer(t('Downloading from {0}', c.name), plan, async (client, p) => {
+            await client.download(p.dir, p.name, p.local);
+            await this.changes.record(c, p.dir, p.name, p.local, p.stamp);
+        });
         this.done(t('{0} file(s) downloaded from {1}.', count, dirs.join(', ')));
     }
 
@@ -333,9 +345,12 @@ export class Commands {
                       (progress, token) => run(progress, token),
                   );
             this.log.info(`Uploaded ${results.length} file(s) to ${c.name}`);
+            await this.recordUploaded(c, plan.slice(0, results.length));
             return results.length;
         } catch (err) {
             if (err instanceof UploadRejectedError) {
+                const index = plan.findIndex((p) => p.dir === err.item.dir && p.name === err.item.name);
+                await this.recordUploaded(c, plan.slice(0, Math.max(index, 0)));
                 await this.handleRejected(c, err, plan);
             }
             if (err instanceof BackupFailedError) {
@@ -348,6 +363,106 @@ export class Commands {
         } finally {
             this.tree.refresh();
             void this.pruneBackups(c);
+        }
+    }
+
+    /** The controller now holds the uploaded files: take them as the new baseline. */
+    private async recordUploaded(c: Controller, uploaded: Transfer[]): Promise<void> {
+        if (!uploaded.length) {
+            return;
+        }
+        try {
+            for (const p of uploaded) {
+                await this.changes.record(c, p.dir, p.name, p.local);
+            }
+            // The controller date of the new files comes with the next listing.
+            await this.changes.refreshRemote(c, [...new Set(uploaded.map((p) => p.dir))]);
+        } catch (err) {
+            this.log.warn(`Change tracking after upload: ${errorText(err)}`);
+        }
+    }
+
+    // ---------------------------------------------------------------- changes
+
+    /** Lists files that differ between the local folder and the controller and opens the diff of the picked one. */
+    async showChanges(): Promise<void> {
+        const c = this.service.requireActive();
+        const files = await vscode.window.withProgress(
+            { location: vscode.ProgressLocation.Notification, title: t('Looking for changes on {0}…', c.name) },
+            async () => {
+                await this.changes.refreshRemote(c, this.changes.trackedDirs(c));
+                return this.changes.changedFiles(c);
+            },
+        );
+        if (!files.length) {
+            const check = t('Check with Robot…');
+            const answer = await vscode.window.showInformationMessage(
+                t('No changes found. Files downloaded with an older version of the extension are only tracked after "Check with Robot".'),
+                check,
+            );
+            if (answer === check) {
+                await this.checkChanges();
+            }
+            return;
+        }
+        const icons: Record<string, string> = { local: '$(edit)', remote: '$(robot)', both: '$(warning)', localOnly: '$(new-file)' };
+        const pick = await vscode.window.showQuickPick(
+            files.map((f) => ({
+                label: `${icons[f.status] ?? ''} ${f.name}`,
+                description: f.dir,
+                detail: statusText(f.status),
+                file: f,
+            })),
+            { title: t('Changed files ({0}) · {1}', files.length, c.name), placeHolder: t('Select a file to compare it with the controller'), matchOnDescription: true },
+        );
+        if (!pick) {
+            return;
+        }
+        if (pick.file.status === 'localOnly') {
+            await vscode.window.showTextDocument(vscode.Uri.file(pick.file.local));
+        } else {
+            await this.compare(vscode.Uri.file(pick.file.local));
+        }
+    }
+
+    /** Reads the controller files that also exist locally and takes them as the baseline for change tracking. */
+    async checkChanges(): Promise<void> {
+        const c = this.service.requireActive();
+        const remoteDirs = (await this.service.run((client) => client.list(''))).filter((e) => e.isDir).map((e) => e.name);
+        const localDirs = remoteDirs.filter((d) => {
+            const p = path.join(c.localFolder, d);
+            return fs.existsSync(p) && fs.readdirSync(p).length > 0;
+        });
+        if (!localDirs.length) {
+            throw new UserError(t('There are no downloaded controller folders yet.'));
+        }
+        const chosen = await vscode.window.showQuickPick(
+            sortEntries(localDirs.map((d) => ({ name: d, isDir: true }))).map((e) => ({
+                label: e.name,
+                description: folderInfo(e.name),
+                picked: c.downloadFolders.some((d) => d.toUpperCase() === e.name.toUpperCase()),
+            })),
+            {
+                canPickMany: true,
+                title: t('Check with Robot · {0}', c.name),
+                placeHolder: t('Folders to compare. The files are read from the controller, nothing is written.'),
+            },
+        );
+        if (!chosen?.length) {
+            return;
+        }
+        const count = await vscode.window.withProgress(
+            { location: vscode.ProgressLocation.Notification, title: t('Comparing with {0}', c.name), cancellable: true },
+            (progress, token) => this.changes.checkWithController(c, chosen.map((p) => p.label), progress, token),
+        );
+        const changed = await this.changes.changedFiles(c);
+        const show = t('Show Changed Files');
+        const answer = await vscode.window.showInformationMessage(
+            t('{0} file(s) compared with {1}, {2} differ.', count, c.name, changed.length),
+            ...(changed.length ? [show] : []),
+        );
+        if (answer === show) {
+            await this.showChanges();
         }
     }
 
@@ -535,21 +650,6 @@ function folderInfo(name: string): string | undefined {
         TXT: t('Text files'),
     };
     return info[name.toUpperCase()];
-}
-
-/** Maps a local file to its place on the controller, e.g. <local>/JOB/A.JBI → { dir: "JOB", name: "A.JBI" }. */
-export function remoteTargetOf(c: Controller, file: string): { dir: string; name: string } | undefined {
-    const rel = path.relative(c.localFolder, file);
-    if (!rel || rel.startsWith('..') || path.isAbsolute(rel)) {
-        return undefined;
-    }
-    const parts = rel.split(path.sep);
-    // Never map hidden folders or files (.vscode, .git, …) to the controller.
-    if (parts.some((p) => p.startsWith('.'))) {
-        return undefined;
-    }
-    const name = parts.pop()!;
-    return { dir: parts.join('/'), name };
 }
 
 function safeFileName(name: string): string {

@@ -191,6 +191,11 @@ export class ControllerService implements vscode.Disposable {
         return pw;
     }
 
+    /** True if connecting will not prompt for a password. */
+    async hasPassword(c: Controller): Promise<boolean> {
+        return c.password !== undefined || (await this.ctx.secrets.get(this.secretKey(c))) !== undefined;
+    }
+
     async storePassword(c: Controller, password: string): Promise<void> {
         await this.ctx.secrets.store(this.secretKey(c), password);
     }

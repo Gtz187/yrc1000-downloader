@@ -30,6 +30,21 @@ export function localPathFor(c: Controller, dir: string, name: string): string {
     return path.join(c.localFolder, ...dir.split('/').filter(Boolean), name);
 }
 
+/** Maps a local file to its place on the controller, e.g. <local>/JOB/A.JBI → { dir: "JOB", name: "A.JBI" }. */
+export function remoteTargetOf(c: Controller, file: string): { dir: string; name: string } | undefined {
+    const rel = path.relative(c.localFolder, file);
+    if (!rel || rel.startsWith('..') || path.isAbsolute(rel)) {
+        return undefined;
+    }
+    const parts = rel.split(path.sep);
+    // Never map hidden folders or files (.vscode, .git, …) to the controller.
+    if (parts.some((p) => p.startsWith('.'))) {
+        return undefined;
+    }
+    const name = parts.pop()!;
+    return { dir: parts.join('/'), name };
+}
+
 /** Read-only URI that shows a file straight from the controller. */
 export function remoteUri(c: Controller, dir: string, name: string, fresh = false): vscode.Uri {
     const query = new URLSearchParams({ controller: c.name });
@@ -62,7 +77,11 @@ export class RemoteTree implements vscode.TreeDataProvider<RemoteNode>, vscode.D
     readonly view: vscode.TreeView<RemoteNode>;
     private readonly disposables: vscode.Disposable[] = [];
 
-    constructor(private readonly service: ControllerService) {
+    constructor(
+        private readonly service: ControllerService,
+        /** Called with every folder listing, e.g. to detect changes on the controller. */
+        private readonly onListing?: (c: Controller, dir: string, entries: RemoteEntry[]) => void,
+    ) {
         this.view = vscode.window.createTreeView('yrc1000.remote', { treeDataProvider: this, showCollapseAll: true, canSelectMany: true });
         this.disposables.push(this.view, this.changed, service.onDidChange(() => this.refresh()));
         this.updateDescription();
@@ -123,6 +142,9 @@ export class RemoteTree implements vscode.TreeDataProvider<RemoteNode>, vscode.D
         try {
             const entries = await this.service.run((client) => client.list(dir));
             this.view.message = undefined;
+            if (dir) {
+                this.onListing?.(c, dir, entries);
+            }
             return sortEntries(entries).map((e) => new RemoteNode(c.name, dir, e.name, e.isDir, e.modified));
         } catch (err) {
             if (!(err instanceof Cancelled)) {

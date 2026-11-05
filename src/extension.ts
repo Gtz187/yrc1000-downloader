@@ -1,15 +1,17 @@
 import * as vscode from 'vscode';
-import { Commands, remoteTargetOf } from './commands';
+import { ChangeTracker } from './changes';
+import { Commands } from './commands';
 import { Cancelled, ControllerService, UserError } from './controllers';
-import { REMOTE_SCHEME, RemoteDocumentProvider, RemoteTree } from './tree';
+import { REMOTE_SCHEME, RemoteDocumentProvider, remoteTargetOf, RemoteTree } from './tree';
 
 const t = vscode.l10n.t;
 
 export function activate(context: vscode.ExtensionContext): void {
     const log = vscode.window.createOutputChannel('YRC1000', { log: true });
     const service = new ControllerService(context, log);
-    const tree = new RemoteTree(service);
-    const commands = new Commands(service, tree, log, vscode.Uri.joinPath(context.globalStorageUri, 'backups').fsPath);
+    const changes = new ChangeTracker(context, service, log);
+    const tree = new RemoteTree(service, (c, dir, entries) => changes.noteListing(c, dir, entries));
+    const commands = new Commands(service, tree, log, vscode.Uri.joinPath(context.globalStorageUri, 'backups').fsPath, changes);
     const status = vscode.window.createStatusBarItem('yrc1000.status', vscode.StatusBarAlignment.Left, 50);
     status.name = 'YRC1000';
     status.command = 'yrc1000.switchController';
@@ -55,6 +57,8 @@ export function activate(context: vscode.ExtensionContext): void {
     register('yrc1000.upload', (uri, uris) => commands.upload(uri, uris));
     register('yrc1000.compare', (arg) => commands.compare(arg));
     register('yrc1000.openBackups', () => commands.openBackups());
+    register('yrc1000.showChanges', () => commands.showChanges());
+    register('yrc1000.checkChanges', () => commands.checkChanges());
     register('yrc1000.refresh', () => tree.refresh());
     register('yrc1000.showLog', () => log.show());
     register('yrc1000.openSettings', () => vscode.commands.executeCommand('workbench.action.openSettings', `@ext:${context.extension.id}`));
@@ -78,8 +82,13 @@ export function activate(context: vscode.ExtensionContext): void {
     context.subscriptions.push(
         log,
         service,
+        changes,
         tree,
         status,
+        vscode.window.registerFileDecorationProvider(changes),
+        changes.onDidChangeSummary((files) => {
+            tree.view.badge = files.length ? { value: files.length, tooltip: t('{0} changed file(s)', files.length) } : undefined;
+        }),
         service.onDidChange(() => updateState()),
         service.onDidChangeBusy((busy) => updateState(busy)),
         vscode.workspace.registerTextDocumentContentProvider(REMOTE_SCHEME, new RemoteDocumentProvider(service)),
