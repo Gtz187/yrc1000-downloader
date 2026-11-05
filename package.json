@@ -1,0 +1,463 @@
+{
+  "name": "yrc1000-downloader",
+  "displayName": "YASKAWA YRC 1000 Downloader",
+  "description": "%extension.description%",
+  "version": "1.2.0",
+  "publisher": "gtz187",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Gtz187/yrc1000-downloader.git"
+  },
+  "license": "MIT",
+  "icon": "media/icon.png",
+  "galleryBanner": {
+    "color": "#0B1F3A",
+    "theme": "dark"
+  },
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Other"
+  ],
+  "keywords": [
+    "yaskawa",
+    "yrc1000",
+    "motoman",
+    "robot",
+    "ftp",
+    "jbi",
+    "inform"
+  ],
+  "main": "./out/extension.js",
+  "l10n": "./l10n",
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": "limited",
+      "description": "%capabilities.untrusted%",
+      "restrictedConfigurations": [
+        "yrc1000.controllers",
+        "yrc1000.uploadOnSave"
+      ]
+    }
+  },
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "yrc1000",
+          "title": "YRC1000",
+          "icon": "media/robot.svg"
+        }
+      ]
+    },
+    "views": {
+      "yrc1000": [
+        {
+          "id": "yrc1000.remote",
+          "name": "%view.remote%",
+          "icon": "media/robot.svg",
+          "contextualTitle": "YRC1000"
+        }
+      ]
+    },
+    "viewsWelcome": [
+      {
+        "view": "yrc1000.remote",
+        "contents": "%welcome.noFolder%",
+        "when": "workbenchState == empty"
+      },
+      {
+        "view": "yrc1000.remote",
+        "contents": "%welcome.noController%",
+        "when": "workbenchState != empty && !yrc1000.hasController"
+      }
+    ],
+    "commands": [
+      {
+        "command": "yrc1000.addController",
+        "title": "%cmd.addController%",
+        "category": "YRC1000",
+        "icon": "$(add)"
+      },
+      {
+        "command": "yrc1000.switchController",
+        "title": "%cmd.switchController%",
+        "category": "YRC1000",
+        "icon": "$(robot)"
+      },
+      {
+        "command": "yrc1000.removeController",
+        "title": "%cmd.removeController%",
+        "category": "YRC1000"
+      },
+      {
+        "command": "yrc1000.editControllers",
+        "title": "%cmd.editControllers%",
+        "category": "YRC1000"
+      },
+      {
+        "command": "yrc1000.testConnection",
+        "title": "%cmd.testConnection%",
+        "category": "YRC1000",
+        "icon": "$(plug)"
+      },
+      {
+        "command": "yrc1000.setPassword",
+        "title": "%cmd.setPassword%",
+        "category": "YRC1000",
+        "icon": "$(key)"
+      },
+      {
+        "command": "yrc1000.clearPassword",
+        "title": "%cmd.clearPassword%",
+        "category": "YRC1000"
+      },
+      {
+        "command": "yrc1000.downloadConfigured",
+        "title": "%cmd.downloadConfigured%",
+        "category": "YRC1000",
+        "icon": "$(cloud-download)"
+      },
+      {
+        "command": "yrc1000.downloadSelected",
+        "title": "%cmd.downloadSelected%",
+        "category": "YRC1000",
+        "icon": "$(cloud-download)"
+      },
+      {
+        "command": "yrc1000.downloadItem",
+        "title": "%cmd.downloadItem%",
+        "category": "YRC1000",
+        "icon": "$(cloud-download)"
+      },
+      {
+        "command": "yrc1000.openRemoteFile",
+        "title": "%cmd.openRemoteFile%",
+        "category": "YRC1000"
+      },
+      {
+        "command": "yrc1000.upload",
+        "title": "%cmd.upload%",
+        "category": "YRC1000",
+        "icon": "$(cloud-upload)"
+      },
+      {
+        "command": "yrc1000.compare",
+        "title": "%cmd.compare%",
+        "category": "YRC1000",
+        "icon": "$(git-compare)"
+      },
+      {
+        "command": "yrc1000.refresh",
+        "title": "%cmd.refresh%",
+        "category": "YRC1000",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "yrc1000.showLog",
+        "title": "%cmd.showLog%",
+        "category": "YRC1000",
+        "icon": "$(output)"
+      },
+      {
+        "command": "yrc1000.openBackups",
+        "title": "%cmd.openBackups%",
+        "category": "YRC1000",
+        "icon": "$(history)"
+      },
+      {
+        "command": "yrc1000.openSettings",
+        "title": "%cmd.openSettings%",
+        "category": "YRC1000",
+        "icon": "$(gear)"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "yrc1000.switchController",
+          "when": "view == yrc1000.remote && yrc1000.hasController",
+          "group": "navigation@1"
+        },
+        {
+          "command": "yrc1000.downloadConfigured",
+          "when": "view == yrc1000.remote && yrc1000.hasController",
+          "group": "navigation@2"
+        },
+        {
+          "command": "yrc1000.refresh",
+          "when": "view == yrc1000.remote && yrc1000.hasController",
+          "group": "navigation@3"
+        },
+        {
+          "command": "yrc1000.downloadSelected",
+          "when": "view == yrc1000.remote && yrc1000.hasController",
+          "group": "1_transfer@1"
+        },
+        {
+          "command": "yrc1000.addController",
+          "when": "view == yrc1000.remote",
+          "group": "2_controller@1"
+        },
+        {
+          "command": "yrc1000.testConnection",
+          "when": "view == yrc1000.remote && yrc1000.hasController",
+          "group": "2_controller@2"
+        },
+        {
+          "command": "yrc1000.setPassword",
+          "when": "view == yrc1000.remote && yrc1000.hasController",
+          "group": "2_controller@3"
+        },
+        {
+          "command": "yrc1000.editControllers",
+          "when": "view == yrc1000.remote",
+          "group": "2_controller@4"
+        },
+        {
+          "command": "yrc1000.removeController",
+          "when": "view == yrc1000.remote && yrc1000.hasController",
+          "group": "2_controller@5"
+        },
+        {
+          "command": "yrc1000.openSettings",
+          "when": "view == yrc1000.remote",
+          "group": "3_misc@1"
+        },
+        {
+          "command": "yrc1000.showLog",
+          "when": "view == yrc1000.remote",
+          "group": "3_misc@2"
+        },
+        {
+          "command": "yrc1000.openBackups",
+          "when": "view == yrc1000.remote && yrc1000.hasController",
+          "group": "3_misc@3"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "yrc1000.compare",
+          "when": "view == yrc1000.remote && viewItem == yrcFile.local",
+          "group": "inline@1"
+        },
+        {
+          "command": "yrc1000.downloadItem",
+          "when": "view == yrc1000.remote && viewItem =~ /^yrc(Dir|File)/",
+          "group": "inline@2"
+        },
+        {
+          "command": "yrc1000.openRemoteFile",
+          "when": "view == yrc1000.remote && viewItem =~ /^yrcFile/",
+          "group": "1_open@1"
+        },
+        {
+          "command": "yrc1000.downloadItem",
+          "when": "view == yrc1000.remote && viewItem =~ /^yrc(Dir|File)/",
+          "group": "2_transfer@1"
+        },
+        {
+          "command": "yrc1000.compare",
+          "when": "view == yrc1000.remote && viewItem == yrcFile.local",
+          "group": "2_transfer@2"
+        }
+      ],
+      "explorer/context": [
+        {
+          "command": "yrc1000.upload",
+          "when": "yrc1000.hasController",
+          "group": "7_yrc1000@1"
+        },
+        {
+          "command": "yrc1000.compare",
+          "when": "yrc1000.hasController && !explorerResourceIsFolder",
+          "group": "7_yrc1000@2"
+        }
+      ],
+      "editor/title": [
+        {
+          "command": "yrc1000.upload",
+          "when": "yrc1000.hasController && resourceLangId == yaskawa-inform && resourceScheme == file",
+          "group": "navigation@90"
+        }
+      ],
+      "editor/title/context": [
+        {
+          "command": "yrc1000.upload",
+          "when": "yrc1000.hasController && resourceScheme == file",
+          "group": "7_yrc1000@1"
+        },
+        {
+          "command": "yrc1000.compare",
+          "when": "yrc1000.hasController && resourceScheme == file",
+          "group": "7_yrc1000@2"
+        }
+      ],
+      "editor/context": [
+        {
+          "command": "yrc1000.upload",
+          "when": "yrc1000.hasController && resourceLangId == yaskawa-inform && resourceScheme == file",
+          "group": "7_yrc1000@1"
+        },
+        {
+          "command": "yrc1000.compare",
+          "when": "yrc1000.hasController && resourceLangId == yaskawa-inform && resourceScheme == file",
+          "group": "7_yrc1000@2"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "yrc1000.downloadItem",
+          "when": "false"
+        },
+        {
+          "command": "yrc1000.openRemoteFile",
+          "when": "false"
+        },
+        {
+          "command": "yrc1000.upload",
+          "when": "yrc1000.hasController"
+        },
+        {
+          "command": "yrc1000.compare",
+          "when": "yrc1000.hasController"
+        }
+      ]
+    },
+    "languages": [
+      {
+        "id": "yaskawa-inform",
+        "aliases": [
+          "YASKAWA INFORM",
+          "INFORM"
+        ],
+        "extensions": [
+          ".jbi",
+          ".JBI"
+        ],
+        "configuration": "./language-configuration.json",
+        "icon": {
+          "light": "./media/jbi-file.svg",
+          "dark": "./media/jbi-file.svg"
+        }
+      }
+    ],
+    "grammars": [
+      {
+        "language": "yaskawa-inform",
+        "scopeName": "source.yaskawa-inform",
+        "path": "./syntaxes/yaskawa-inform.tmLanguage.json"
+      }
+    ],
+    "configuration": {
+      "title": "YRC1000",
+      "properties": {
+        "yrc1000.controllers": {
+          "type": "array",
+          "markdownDescription": "%config.controllers%",
+          "default": [],
+          "scope": "resource",
+          "order": 1,
+          "items": {
+            "type": "object",
+            "required": [
+              "host"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "%config.controllers.name%"
+              },
+              "host": {
+                "type": "string",
+                "description": "%config.controllers.host%"
+              },
+              "port": {
+                "type": "number",
+                "default": 21,
+                "description": "%config.controllers.port%"
+              },
+              "username": {
+                "type": "string",
+                "description": "%config.controllers.username%"
+              },
+              "password": {
+                "type": "string",
+                "markdownDescription": "%config.controllers.password%"
+              },
+              "localFolder": {
+                "type": "string",
+                "description": "%config.controllers.localFolder%"
+              },
+              "downloadFolders": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "%config.controllers.downloadFolders%"
+              }
+            }
+          }
+        },
+        "yrc1000.downloadFolders": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "JOB"
+          ],
+          "markdownDescription": "%config.downloadFolders%",
+          "scope": "resource",
+          "order": 2
+        },
+        "yrc1000.confirmUpload": {
+          "type": "boolean",
+          "default": true,
+          "description": "%config.confirmUpload%",
+          "scope": "resource",
+          "order": 3
+        },
+        "yrc1000.uploadOnSave": {
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "%config.uploadOnSave%",
+          "scope": "resource",
+          "order": 4
+        },
+        "yrc1000.timeout": {
+          "type": "number",
+          "default": 15000,
+          "minimum": 1000,
+          "description": "%config.timeout%",
+          "scope": "resource",
+          "order": 5
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "lint": "eslint src",
+    "test": "npm run compile && node --test \"out/test/**/*.test.js\"",
+    "package": "vsce package --allow-missing-repository",
+    "publish": "vsce publish --allow-missing-repository"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.17.0",
+    "@types/node": "^20.11.0",
+    "@types/vscode": "~1.85.0",
+    "@vscode/vsce": "^3.2.0",
+    "eslint": "^9.17.0",
+    "typescript": "^5.4.0",
+    "typescript-eslint": "^8.18.0"
+  }
+}

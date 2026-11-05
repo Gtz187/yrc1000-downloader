@@ -1,0 +1,40 @@
+name: Release
+
+# Push a tag like v1.0.1 to publish to the Visual Studio Marketplace
+# and attach the .vsix to a GitHub release.
+# Requires the repository secret VSCE_PAT (Azure DevOps token with "Marketplace: Manage").
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm test
+      - name: Check tag matches package.json version
+        run: |
+          VERSION="v$(node -p "require('./package.json').version")"
+          if [ "$VERSION" != "$GITHUB_REF_NAME" ]; then
+            echo "Tag $GITHUB_REF_NAME does not match package.json version $VERSION"; exit 1
+          fi
+      - run: npx vsce package --allow-missing-repository -o yrc1000-downloader-${{ github.ref_name }}.vsix
+      - name: Publish to Visual Studio Marketplace
+        run: npx vsce publish --allow-missing-repository --packagePath yrc1000-downloader-${{ github.ref_name }}.vsix
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: yrc1000-downloader-${{ github.ref_name }}.vsix
+          generate_release_notes: true

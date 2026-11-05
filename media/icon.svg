@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0B1F3A"/>
+      <stop offset="1" stop-color="#1557B0"/>
+    </linearGradient>
+    <linearGradient id="arm" gradientUnits="userSpaceOnUse" x1="40" y1="220" x2="220" y2="60">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#CFE3FF"/>
+    </linearGradient>
+    <radialGradient id="glow" cx=".75" cy=".2" r=".7">
+      <stop offset="0" stop-color="#4FC3F7" stop-opacity=".45"/>
+      <stop offset="1" stop-color="#4FC3F7" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="256" height="256" rx="56" fill="url(#bg)"/>
+  <rect width="256" height="256" rx="56" fill="url(#glow)"/>
+
+  <!-- robot arm -->
+  <g fill="none" stroke="url(#arm)" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M40 212h112" stroke-width="14"/>
+    <path d="M62 212v-18a34 34 0 0 1 68 0v18" stroke-width="14"/>
+    <path d="M96 160 132 84" stroke-width="18"/>
+    <path d="M150 78 196 102" stroke-width="16"/>
+    <path d="m198 104 20-14m-20 14 10 22" stroke-width="10"/>
+  </g>
+  <circle cx="96" cy="160" r="17" fill="#0B1F3A" stroke="#FFFFFF" stroke-width="10"/>
+  <circle cx="138" cy="72" r="17" fill="#0B1F3A" stroke="#FFFFFF" stroke-width="10"/>
+
+  <!-- transfer badge -->
+  <circle cx="196" cy="190" r="40" fill="#4FC3F7"/>
+  <g fill="none" stroke="#0B1F3A" stroke-width="9" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M182 166v44m-12-12 12 12 12-12"/>
+    <path d="M210 214v-44m-12 12 12-12 12 12"/>
+  </g>
+</svg>
